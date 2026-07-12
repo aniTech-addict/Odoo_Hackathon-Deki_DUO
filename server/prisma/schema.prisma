@@ -16,11 +16,13 @@ model User {
   refreshToken String?
   type         String   @default("user")
   role         String   @default("user")
-  isVerified   Boolean  @default(false)
-  otpId        String?  @unique
-  otp          Otp?     @relation(fields: [otpId], references: [id], onDelete: SetNull)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  isVerified     Boolean  @default(false)
+  otpId          String?  @unique
+  otp            Otp?     @relation(fields: [otpId], references: [id], onDelete: SetNull)
+  failedAttempts Int      @default(0)
+  status         String   @default("active")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
 model Otp {
@@ -30,4 +32,19 @@ model Otp {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   user      User?
+}
+
+model Vehicle {
+  id                 String   @id @default(cuid())
+  registrationNumber String   @unique
+  model              String
+  type               String[]
+  capacityAmount     Float
+  capacityUnit       String
+  odometer           Float
+  costAmount         Float
+  costCurrency       String   @default("rupees")
+  status             String   @default("available")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 }

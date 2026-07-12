@@ -7,6 +7,7 @@ import connectDb from './db/connectDb.js'
 
 //Authorization
 import authRouter from './routes/auth.route.js'
+import vehicleRouter from './routes/vehicle.route.js'
 import authorizationMiddleware from './middlewares/authorizeUser.middleware.js'
 import { authorizeAdmin } from './middlewares/authorizeAdmin.middleware.js'
 
@@ -20,6 +21,7 @@ app.use(cookieParser())
 app.use('/uploads', express.static('uploads'))
 
 app.use('/api/v1/auth', authRouter)
+app.use('/api/v1/vehicles', authorizationMiddleware, vehicleRouter)
 app.use('/api/v1/profile', authorizationMiddleware, authorizeAdmin, (req, res) => {
 	res.status(200).json({ message: 'Authorized' })
 })
@@ -28,7 +30,7 @@ app.get('/', (req, res) => {
 })
 
 app.listen(PORT, () => {
-	console.log(`Server is running on port ${PORT}`)
+	console.log(`Server is running at http://localhost:${PORT}`)
 })
 
 export default app

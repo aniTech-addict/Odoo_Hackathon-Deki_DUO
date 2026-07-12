@@ -1,9 +1,11 @@
 import prisma from '../db/prisma.js'
 import { createAccessToken, createRefreshToken } from '../utils/createToken.js'
 import bcrypt from 'bcrypt'
-import { generateOtp } from '../utils/otpManager.js'
-import { verifyOtp } from '../utils/otpManager.js'
+import { generateOtp, verifyOtpValue } from '../utils/otpManager.js'
 import { z } from 'zod'
+import jwt from 'jsonwebtoken'
+import { JWT_ACCESS_SECRET } from '../configs/env.js'
+import { createMail, sendMail } from '../utils/sendMail.js'
 
 const authCredentialsSchema = z.object({
 	username: z.string().min(1, 'Username is required'),
@@ -12,10 +14,20 @@ const authCredentialsSchema = z.object({
 
 const signUpSchema = authCredentialsSchema.extend({
 	email: z.email('Invalid email format'),
+	role: z.enum(['Fleet Manager', 'Dispatcher', 'Safety Officer', 'Financial Analyst'], {
+		message: 'Role must be one of: Fleet Manager, Dispatcher, Safety Officer, Financial Analyst',
+	}),
+})
+
+const otpVerificationSchema = z.object({
+	otp: z.coerce.number(),
+	userSignupToken: z.string().min(1, 'User signup token is required'),
 })
 
 type SignUpInput = z.infer<typeof signUpSchema>
 type SignInInput = z.infer<typeof authCredentialsSchema>
+type OtpVerificationInput = z.infer<typeof otpVerificationSchema>
+
 
 export const sign_up = async (req, res) => {
 	try {
@@ -24,11 +36,11 @@ export const sign_up = async (req, res) => {
 		if (!parsedBody.success) {
 			return res.status(400).json({
 				message: 'Invalid sign up data',
-				errors: parsedBody.error.flatten().fieldErrors,
+				errors: z.treeifyError(parsedBody.error)
 			})
 		}
 
-		const { username, email, password }: SignUpInput = parsedBody.data
+		const { username, email, password, role }: SignUpInput = parsedBody.data
 
 		const existingUser = await prisma.user.findFirst({
 			where: {
@@ -40,20 +52,19 @@ export const sign_up = async (req, res) => {
 			return res.status(400).json({ message: 'User already exists' })
 		}
 
-		const otpId = await generateOtp(email)
-		const newUser = await prisma.user.create({
-			data: {
-				username,
-				email,
-				password: await bcrypt.hash(password, 10),
-				otpId,
-			},
-		})
+		const hashedOtp = await generateOtp(email)
+		const hashedPassword = await bcrypt.hash(password, 10)
+
+		const signupToken = jwt.sign(
+			{ username, email, password: hashedPassword, role, hashedOtp },
+			JWT_ACCESS_SECRET,
+			{ expiresIn: '5m' }
+		)
 
 		return res.status(201).json({
 			status: 'success',
 			message: 'redirect to otp verification',
-			userId: newUser.id,
+			userSignupToken: signupToken,
 		})
 	} catch (error) {
 		console.log('Error in sign up:', error)
@@ -62,41 +73,66 @@ export const sign_up = async (req, res) => {
 }
 
 export const otp_verification = async (req, res) => {
-	const { otp, userId } = req.body
+	const parsedBody = otpVerificationSchema.safeParse(req.body)
 
-	const validOtp = await verifyOtp(userId, otp)
-
-	if (!validOtp) {
-		return res.status(401).json({ success: false, message: 'Invalid OTP' })
+	if (!parsedBody.success) {
+		return res.status(400).json({
+			status: 'failed',
+			message: 'Invalid OTP verification data',
+			errors: z.treeifyError(parsedBody.error)
+		})
 	}
 
-	try {
-		const user = await prisma.user.findUnique({
-			where: { id: userId },
-		})
+	const { otp, userSignupToken }: OtpVerificationInput = parsedBody.data
 
-		if (!user) {
-			return res.status(404).json({ message: 'User not found' })
+	try {
+		let decoded: any
+		try {
+			decoded = jwt.verify(userSignupToken, JWT_ACCESS_SECRET)
+		} catch (err) {
+			return res.status(400).json({ status: 'failed', message: 'Invalid or expired signup token' })
 		}
 
-		const payload = { userId: user.id, username: user.username }
+		const { username, email, password, role, hashedOtp } = decoded
+
+		const existingUser = await prisma.user.findFirst({
+			where: {
+				OR: [{ username }, { email }],
+			},
+		})
+
+		if (existingUser) {
+			return res.status(400).json({ message: 'User already exists' })
+		}
+
+		const validOtp = await verifyOtpValue(otp, hashedOtp)
+
+		if (!validOtp) {
+			return res.status(401).json({ success: false, message: 'Invalid OTP' })
+		}
+
+		const newUser = await prisma.user.create({
+			data: {
+				username,
+				email,
+				password, // already hashed
+				role,
+				isVerified: true,
+			},
+		})
+
+		const payload = { userId: newUser.id, username: newUser.username }
 		const accessToken = await createAccessToken(payload)
 		const refreshToken = await createRefreshToken(payload)
 
 		res.cookie('token', accessToken, { httpOnly: true, secure: true, sameSite: 'strict' })
 
-		await prisma.$transaction([
-			prisma.user.update({
-				where: { id: userId },
-				data: {
-					isVerified: true,
-					refreshToken,
-					otpId: null,
-				},
-			}),
-		])
+		await prisma.user.update({
+			where: { id: newUser.id },
+			data: { refreshToken },
+		})
 
-		return res.status(200).json({ status: 'success', message: 'OTP verified successfully' })
+		return res.status(200).json({ status: 'success', message: 'OTP verified successfully', userId: newUser.id })
 	} catch (err) {
 		console.log(err)
 		res.status(500).json({ message: 'Internal server error' })
@@ -117,22 +153,76 @@ export const sign_in = async (req, res) => {
 
 		const { username, password }: SignInInput = parsedBody.data
 
-		const user = await prisma.user.findUnique({ where: { username } })
+		const user: any = await prisma.user.findUnique({ where: { username } })
 		if (!user) {
 			return res.status(404).json({ status: 'failed', message: 'User not found' })
 		}
 
+		if (user.status === 'locked') {
+			return res.status(403).json({
+				status: 'failed',
+				message: 'Account is locked due to too many failed attempts',
+			})
+		}
+
 		const isPasswordValid = await bcrypt.compare(password, user.password)
 		if (!isPasswordValid) {
-			return res.status(401).json({ status: 'failed', message: 'Invalid password ' })
+			const newAttempts = user.failedAttempts + 1
+			if (newAttempts >= 5) {
+				await (prisma.user.update as any)({
+					where: { id: user.id },
+					data: {
+						failedAttempts: newAttempts,
+						status: 'locked',
+					},
+				})
+				const mailContent = new createMail(
+					'Security Alert: Your Account Has Been Locked',
+					`Hello,\n\nThere were multiple failed login attempts on your account. For your security, your account has been temporarily locked.\n\nIf this wasn't you, please contact support immediately.\n\nBest regards,\nThe AniTech Team`,
+					`
+						<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+							<h2 style="color: #dc2626; text-align: center;">Security Alert: Account Locked</h2>
+							<p>Hello,</p>
+							<p>We detected multiple failed login attempts for your account. To protect your personal information, your account has been temporarily locked.</p>
+							<p style="color: #dc2626; font-weight: bold;">If you did not initiate these login attempts, your account credentials may be compromised.</p>
+							<p>Please contact our support team immediately to verify your identity and unlock your account.</p>
+							<br />
+							<p>Best regards,<br /><strong>The AniTech Team</strong></p>
+						</div>
+					`
+				)
+				sendMail(user.email, mailContent).catch((err) => {
+					console.error('Failed to send account lockout email:', err)
+				})
+				return res.status(401).json({
+					status: 'failed',
+					message: 'Account is locked due to too many failed attempts',
+				})
+			} else {
+				await (prisma.user.update as any)({
+					where: { id: user.id },
+					data: {
+						failedAttempts: newAttempts,
+					},
+				})
+				return res.status(401).json({
+					status: 'failed',
+					message: 'Invalid password',
+				})
+			}
 		}
 
 		const token = await createAccessToken({ userId: user.id, username: user.username })
 		const refreshToken = await createRefreshToken({ userId: user.id, username: user.username })
 
-		await prisma.user.update({
+		const updateData: any = { refreshToken }
+		if (user.failedAttempts > 0) {
+			updateData.failedAttempts = 0
+		}
+
+		await (prisma.user.update as any)({
 			where: { id: user.id },
-			data: { refreshToken },
+			data: updateData,
 		})
 		//Sets cookies
 		res.cookie('token', token, { httpOnly: true, secure: true, sameSite: 'strict' })

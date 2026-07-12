@@ -10,7 +10,9 @@ export const userSchema = z.object({
 	type: z.string().default('user'),
 	role: z.string().default('user'),
 	isVerified: z.boolean().default(false),
-	otpId: z.string().cuid().nullable().optional(),
+	otpId: z.cuid2().nullable().optional(),
+	failedAttempts: z.number().default(0),
+	status: z.string().default('active'),
 	createdAt: z.date(),
 	updatedAt: z.date(),
 })

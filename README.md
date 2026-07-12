@@ -1,3 +1,34 @@
+# Local Postgres with Docker
+
+See [docs/postgres-setup.md](docs/postgres-setup.md) for the short step-by-step guide.
+
+Start the development database:
+
+```bash
+docker compose --profile dev up -d
+```
+
+Start the production-style database:
+
+```bash
+docker compose --profile prod up -d
+```
+
+Use these connection strings:
+
+- Dev: `postgresql://postgres:postgres@localhost:5434/odoo_dev?schema=public`
+- Prod: `postgresql://postgres:postgres@localhost:5433/odoo_prod?schema=public`
+
+The server reads `DATABASE_URL` from the environment. Copy `server/.env.example` to `server/.env` and switch the URL to the profile you want.
+
+Prisma workflow:
+
+1. Start the database: `docker compose --profile dev up -d`
+2. Create the initial migration for development: `cd server && npm run db:migrate:dev`
+3. Generate the Prisma client if needed: `cd server && npm run prisma:generate`
+4. For production-like deployments, apply existing migrations only: `cd server && npm run db:migrate:prod`
+
+Use `DATABASE_URL=postgresql://postgres:postgres@localhost:5433/odoo_prod?schema=public` for the prod profile, and the `5434` URL for dev.
 TransitOps
 Smart Transport Operations Platform
 Hackathon Duration: 8 Hours
