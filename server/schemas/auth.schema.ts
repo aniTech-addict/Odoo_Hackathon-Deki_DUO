@@ -11,6 +11,8 @@ export const userSchema = z.object({
 	role: z.string().default('user'),
 	isVerified: z.boolean().default(false),
 	otpId: z.string().cuid().nullable().optional(),
+	failedAttempts: z.number().default(0),
+	status: z.string().default('active'),
 	createdAt: z.date(),
 	updatedAt: z.date(),
 })
