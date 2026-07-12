@@ -43,7 +43,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
 				<div className="sidebar__profile">
 					<div className="sidebar__avatar" />
 					<div>
-						<strong>A. Reynolds</strong>
+						<strong>SANJU KUMAR</strong>
 						<span>Operations Chief</span>
 					</div>
 				</div>
