@@ -133,7 +133,7 @@ export class TripService {
 	}
 
 	static async listTrips(filters: { status?: string }) {
-		const where: any = {}
+		const where: { status?: string } = {}
 		if (filters.status) {
 			where.status = filters.status
 		}
