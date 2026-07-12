@@ -48,3 +48,54 @@ model Vehicle {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 }
+
+model Driver {
+  id              String   @id @default(cuid())
+  name            String   @unique
+  licenseNumber   String
+  licenseCategory String
+  licenseExpiry   String
+  contactNumber   String
+  safetyScore     Float    @default(100)
+  status          String   @default("Available")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Trip {
+  id              String   @id @default(cuid())
+  route           String
+  origin          String
+  destination     String
+  vehiclePlate    String
+  driver          String
+  departure       String
+  cargoWeight     Float
+  plannedDistance Float
+  status          String   @default("Draft")
+  progress        Float    @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Expense {
+  id        String   @id @default(cuid())
+  category  String
+  asset     String
+  amount    Float
+  date      String
+  note      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model MaintenanceLog {
+  id        String   @id @default(cuid())
+  title     String
+  asset     String
+  status    String   @default("Scheduled")
+  cost      Float
+  nextCheck String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

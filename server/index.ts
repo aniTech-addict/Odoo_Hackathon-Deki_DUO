@@ -8,6 +8,10 @@ import connectDb from './db/connectDb.js'
 //Authorization
 import authRouter from './routes/auth.route.js'
 import vehicleRouter from './routes/vehicle.route.js'
+import driverRouter from './routes/driver.route.js'
+import tripRouter from './routes/trip.route.js'
+import expenseRouter from './routes/expense.route.js'
+import maintenanceRouter from './routes/maintenance.route.js'
 import authorizationMiddleware from './middlewares/authorizeUser.middleware.js'
 import { authorizeAdmin } from './middlewares/authorizeAdmin.middleware.js'
 
@@ -22,6 +26,10 @@ app.use('/uploads', express.static('uploads'))
 
 app.use('/api/v1/auth', authRouter)
 app.use('/api/v1/vehicles', authorizationMiddleware, vehicleRouter)
+app.use('/api/v1/drivers', authorizationMiddleware, driverRouter)
+app.use('/api/v1/trips', authorizationMiddleware, tripRouter)
+app.use('/api/v1/expenses', authorizationMiddleware, expenseRouter)
+app.use('/api/v1/maintenance', authorizationMiddleware, maintenanceRouter)
 app.use('/api/v1/profile', authorizationMiddleware, authorizeAdmin, (req, res) => {
 	res.status(200).json({ message: 'Authorized' })
 })
