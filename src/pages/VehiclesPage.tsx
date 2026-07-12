@@ -1,4 +1,6 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useMemo } from 'react'
+import { useForm, Controller } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { DataTable } from '../components/DataTable'
 import { Field } from '../components/Field'
 import { SectionCard } from '../components/SectionCard'
@@ -34,8 +36,14 @@ export function VehiclesPage({
 	statusFilter,
 	typeFilter,
 }: VehiclesPageProps) {
-	const [form, setForm] = useState<VehicleInput>(createVehicleForm)
-	const [errors, setErrors] = useState<Partial<Record<keyof VehicleInput, string>>>({})
+	const {
+		control,
+		handleSubmit,
+		reset,
+	} = useForm<VehicleInput>({
+		resolver: zodResolver(vehicleSchema),
+		defaultValues: createVehicleForm(),
+	})
 
 	const activeCount = useMemo(
 		() => vehicles.filter((vehicle) => vehicle.status === 'Active').length,
@@ -46,34 +54,14 @@ export function VehiclesPage({
 		[vehicles]
 	)
 
-	const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-		event.preventDefault()
-
-		const result = vehicleSchema.safeParse(form)
-
-		if (!result.success) {
-			const fieldErrors: Partial<Record<keyof VehicleInput, string>> = {}
-
-			for (const issue of result.error.issues) {
-				const field = issue.path[0] as keyof VehicleInput | undefined
-
-				if (field && !fieldErrors[field]) {
-					fieldErrors[field] = issue.message
-				}
-			}
-
-			setErrors(fieldErrors)
-			return
-		}
-
+	const onSubmit = (data: VehicleInput) => {
 		const vehicle: VehicleRecord = {
-			...result.data,
+			...data,
 			id: `VEH-${Date.now().toString().slice(-5)}`,
 		}
 
 		onAddVehicle(vehicle)
-		setErrors({})
-		setForm(createVehicleForm())
+		reset(createVehicleForm())
 	}
 
 	return (
@@ -140,108 +128,128 @@ export function VehiclesPage({
 					title="Register vehicle"
 					subtitle="Validated by Zod before the asset is added to the fleet."
 				>
-					<form className="stack" onSubmit={handleSubmit}>
+					<form className="stack" onSubmit={handleSubmit(onSubmit)}>
 						<div className="field-grid">
-							<Field
-								label="Plate"
-								id="vehicle-plate"
-								placeholder="KDA-112A"
-								value={form.plate}
-								error={errors.plate}
-								onChange={(value) =>
-									setForm((current) => ({
-										...current,
-										plate: value.toUpperCase(),
-									}))
-								}
+							<Controller
+								control={control}
+								name="plate"
+								render={({ field: { onChange, value }, fieldState: { error } }) => (
+									<Field
+										label="Plate"
+										id="vehicle-plate"
+										placeholder="KDA-112A"
+										value={value}
+										error={error?.message}
+										onChange={(val) => onChange(val.toUpperCase())}
+									/>
+								)}
 							/>
-							<Field
-								label="Vehicle type"
-								id="vehicle-type"
-								value={form.vehicleType}
-								options={[
-									{ label: 'Bus', value: 'Bus' },
-									{ label: 'Minibus', value: 'Minibus' },
-									{ label: 'Truck', value: 'Truck' },
-									{ label: 'Van', value: 'Van' },
-								]}
-								error={errors.vehicleType}
-								onChange={(value) =>
-									setForm((current) => ({
-										...current,
-										vehicleType: value as VehicleInput['vehicleType'],
-									}))
-								}
+							<Controller
+								control={control}
+								name="vehicleType"
+								render={({ field: { onChange, value }, fieldState: { error } }) => (
+									<Field
+										label="Vehicle type"
+										id="vehicle-type"
+										value={value}
+										options={[
+											{ label: 'Bus', value: 'Bus' },
+											{ label: 'Minibus', value: 'Minibus' },
+											{ label: 'Truck', value: 'Truck' },
+											{ label: 'Van', value: 'Van' },
+										]}
+										error={error?.message}
+										onChange={onChange}
+									/>
+								)}
 							/>
-							<Field
-								label="Driver"
-								id="vehicle-driver"
-								placeholder="Assigned driver"
-								value={form.driver}
-								error={errors.driver}
-								onChange={(value) =>
-									setForm((current) => ({ ...current, driver: value }))
-								}
+							<Controller
+								control={control}
+								name="driver"
+								render={({ field: { onChange, value }, fieldState: { error } }) => (
+									<Field
+										label="Driver"
+										id="vehicle-driver"
+										placeholder="Assigned driver"
+										value={value}
+										error={error?.message}
+										onChange={onChange}
+									/>
+								)}
 							/>
-							<Field
-								label="Route"
-								id="vehicle-route"
-								placeholder="Central loop"
-								value={form.route}
-								error={errors.route}
-								onChange={(value) =>
-									setForm((current) => ({ ...current, route: value }))
-								}
+							<Controller
+								control={control}
+								name="route"
+								render={({ field: { onChange, value }, fieldState: { error } }) => (
+									<Field
+										label="Route"
+										id="vehicle-route"
+										placeholder="Central loop"
+										value={value}
+										error={error?.message}
+										onChange={onChange}
+									/>
+								)}
 							/>
-							<Field
-								label="Mileage"
-								id="vehicle-mileage"
-								type="number"
-								value={String(form.mileage)}
-								error={errors.mileage}
-								onChange={(value) =>
-									setForm((current) => ({ ...current, mileage: Number(value) }))
-								}
+							<Controller
+								control={control}
+								name="mileage"
+								render={({ field: { onChange, value }, fieldState: { error } }) => (
+									<Field
+										label="Mileage"
+										id="vehicle-mileage"
+										type="number"
+										value={value}
+										error={error?.message}
+										onChange={(val) => onChange(Number(val))}
+									/>
+								)}
 							/>
-							<Field
-								label="Next service"
-								id="vehicle-next-service"
-								type="date"
-								value={form.nextService}
-								error={errors.nextService}
-								onChange={(value) =>
-									setForm((current) => ({ ...current, nextService: value }))
-								}
+							<Controller
+								control={control}
+								name="nextService"
+								render={({ field: { onChange, value }, fieldState: { error } }) => (
+									<Field
+										label="Next service"
+										id="vehicle-next-service"
+										type="date"
+										value={value}
+										error={error?.message}
+										onChange={onChange}
+									/>
+								)}
 							/>
-							<Field
-								label="Utilization"
-								id="vehicle-utilization"
-								type="number"
-								value={String(form.utilization)}
-								error={errors.utilization}
-								onChange={(value) =>
-									setForm((current) => ({
-										...current,
-										utilization: Number(value),
-									}))
-								}
+							<Controller
+								control={control}
+								name="utilization"
+								render={({ field: { onChange, value }, fieldState: { error } }) => (
+									<Field
+										label="Utilization"
+										id="vehicle-utilization"
+										type="number"
+										value={value}
+										error={error?.message}
+										onChange={(val) => onChange(Number(val))}
+									/>
+								)}
 							/>
-							<Field
-								label="Status"
-								id="vehicle-status"
-								value={form.status}
-								options={[
-									{ label: 'Active', value: 'Active' },
-									{ label: 'Inspection', value: 'Inspection' },
-									{ label: 'Maintenance', value: 'Maintenance' },
-								]}
-								error={errors.status}
-								onChange={(value) =>
-									setForm((current) => ({
-										...current,
-										status: value as VehicleInput['status'],
-									}))
-								}
+							<Controller
+								control={control}
+								name="status"
+								render={({ field: { onChange, value }, fieldState: { error } }) => (
+									<Field
+										label="Status"
+										id="vehicle-status"
+										value={value}
+										options={[
+											{ label: 'Active', value: 'Active' },
+											{ label: 'Inspection', value: 'Inspection' },
+											{ label: 'Maintenance', value: 'Maintenance' },
+										]}
+										error={error?.message}
+										onChange={onChange}
+									/>
+								)}
 							/>
 						</div>
 
@@ -252,7 +260,7 @@ export function VehiclesPage({
 							<button
 								className="button button--secondary"
 								type="button"
-								onClick={() => setForm(createVehicleForm())}
+								onClick={() => reset(createVehicleForm())}
 							>
 								Reset form
 							</button>

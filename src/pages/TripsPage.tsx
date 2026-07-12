@@ -1,4 +1,5 @@
-import { useState, type FormEvent } from 'react'
+import { useForm, Controller } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { DataTable } from '../components/DataTable'
 import { Field } from '../components/Field'
 import { SectionCard } from '../components/SectionCard'
@@ -24,38 +25,25 @@ const createTripForm = (vehicles: VehicleRecord[]): TripInput => ({
 })
 
 export function TripsPage({ trips, vehicles, onAddTrip }: TripsPageProps) {
-	const [form, setForm] = useState<TripInput>(() => createTripForm(vehicles))
-	const [errors, setErrors] = useState<Partial<Record<keyof TripInput, string>>>({})
+	const {
+		control,
+		handleSubmit,
+		reset,
+		setValue,
+	} = useForm<TripInput>({
+		resolver: zodResolver(tripSchema),
+		defaultValues: createTripForm(vehicles),
+	})
 
 	const activeTrips = trips.filter((trip) => trip.status !== 'Completed').length
 
-	const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-		event.preventDefault()
-
-		const result = tripSchema.safeParse(form)
-
-		if (!result.success) {
-			const fieldErrors: Partial<Record<keyof TripInput, string>> = {}
-
-			for (const issue of result.error.issues) {
-				const field = issue.path[0] as keyof TripInput | undefined
-
-				if (field && !fieldErrors[field]) {
-					fieldErrors[field] = issue.message
-				}
-			}
-
-			setErrors(fieldErrors)
-			return
-		}
-
+	const onSubmit = (data: TripInput) => {
 		onAddTrip({
-			...result.data,
+			...data,
 			id: `TRP-${Date.now().toString().slice(-5)}`,
 			progress: 10,
 		})
-		setErrors({})
-		setForm(createTripForm(vehicles))
+		reset(createTripForm(vehicles))
 	}
 
 	return (
@@ -118,105 +106,135 @@ export function TripsPage({ trips, vehicles, onAddTrip }: TripsPageProps) {
 					title="Dispatch trip"
 					subtitle="Validated by Zod before the trip enters the board."
 				>
-					<form className="stack" onSubmit={handleSubmit}>
+					<form className="stack" onSubmit={handleSubmit(onSubmit)}>
 						<div className="field-grid">
-							<Field
-								label="Route"
-								id="trip-route"
-								placeholder="Central loop"
-								value={form.route}
-								error={errors.route}
-								onChange={(value) =>
-									setForm((current) => ({ ...current, route: value }))
-								}
+							<Controller
+								control={control}
+								name="route"
+								render={({ field: { onChange, value }, fieldState: { error } }) => (
+									<Field
+										label="Route"
+										id="trip-route"
+										placeholder="Central loop"
+										value={value}
+										error={error?.message}
+										onChange={onChange}
+									/>
+								)}
 							/>
-							<Field
-								label="Origin"
-								id="trip-origin"
-								placeholder="CBD terminal"
-								value={form.origin}
-								error={errors.origin}
-								onChange={(value) =>
-									setForm((current) => ({ ...current, origin: value }))
-								}
+							<Controller
+								control={control}
+								name="origin"
+								render={({ field: { onChange, value }, fieldState: { error } }) => (
+									<Field
+										label="Origin"
+										id="trip-origin"
+										placeholder="CBD terminal"
+										value={value}
+										error={error?.message}
+										onChange={onChange}
+									/>
+								)}
 							/>
-							<Field
-								label="Destination"
-								id="trip-destination"
-								placeholder="West gate"
-								value={form.destination}
-								error={errors.destination}
-								onChange={(value) =>
-									setForm((current) => ({ ...current, destination: value }))
-								}
+							<Controller
+								control={control}
+								name="destination"
+								render={({ field: { onChange, value }, fieldState: { error } }) => (
+									<Field
+										label="Destination"
+										id="trip-destination"
+										placeholder="West gate"
+										value={value}
+										error={error?.message}
+										onChange={onChange}
+									/>
+								)}
 							/>
-							<Field
-								label="Departure"
-								id="trip-departure"
-								type="time"
-								value={form.departure}
-								error={errors.departure}
-								onChange={(value) =>
-									setForm((current) => ({ ...current, departure: value }))
-								}
+							<Controller
+								control={control}
+								name="departure"
+								render={({ field: { onChange, value }, fieldState: { error } }) => (
+									<Field
+										label="Departure"
+										id="trip-departure"
+										type="time"
+										value={value}
+										error={error?.message}
+										onChange={onChange}
+									/>
+								)}
 							/>
-							<Field
-								label="Vehicle"
-								id="trip-vehicle"
-								value={form.vehiclePlate}
-								error={errors.vehiclePlate}
-								options={vehicles.map((vehicle) => ({
-									label: vehicle.plate,
-									value: vehicle.plate,
-								}))}
-								onChange={(value) => {
-									const matchedVehicle = vehicles.find(
-										(vehicle) => vehicle.plate === value
-									)
-									setForm((current) => ({
-										...current,
-										vehiclePlate: value,
-										driver: matchedVehicle?.driver ?? current.driver,
-									}))
-								}}
+							<Controller
+								control={control}
+								name="vehiclePlate"
+								render={({ field: { onChange, value }, fieldState: { error } }) => (
+									<Field
+										label="Vehicle"
+										id="trip-vehicle"
+										value={value}
+										error={error?.message}
+										options={vehicles.map((vehicle) => ({
+											label: vehicle.plate,
+											value: vehicle.plate,
+										}))}
+										onChange={(val) => {
+											onChange(val)
+											const matchedVehicle = vehicles.find(
+												(vehicle) => vehicle.plate === val
+											)
+											if (matchedVehicle?.driver) {
+												setValue('driver', matchedVehicle.driver, { shouldValidate: true })
+											}
+										}}
+									/>
+								)}
 							/>
-							<Field
-								label="Driver"
-								id="trip-driver"
-								placeholder="Assigned driver"
-								value={form.driver}
-								error={errors.driver}
-								onChange={(value) =>
-									setForm((current) => ({ ...current, driver: value }))
-								}
+							<Controller
+								control={control}
+								name="driver"
+								render={({ field: { onChange, value }, fieldState: { error } }) => (
+									<Field
+										label="Driver"
+										id="trip-driver"
+										placeholder="Assigned driver"
+										value={value}
+										error={error?.message}
+										onChange={onChange}
+									/>
+								)}
 							/>
-							<Field
-								label="Load (%)"
-								id="trip-load"
-								type="number"
-								value={String(form.load)}
-								error={errors.load}
-								onChange={(value) =>
-									setForm((current) => ({ ...current, load: Number(value) }))
-								}
+							<Controller
+								control={control}
+								name="load"
+								render={({ field: { onChange, value }, fieldState: { error } }) => (
+									<Field
+										label="Load (%)"
+										id="trip-load"
+										type="number"
+										value={value}
+										error={error?.message}
+										onChange={(val) => onChange(Number(val))}
+									/>
+								)}
 							/>
-							<Field
-								label="Status"
-								id="trip-status"
-								value={form.status}
-								options={[
-									{ label: 'Scheduled', value: 'Scheduled' },
-									{ label: 'Boarding', value: 'Boarding' },
-									{ label: 'In Transit', value: 'In Transit' },
-									{ label: 'Completed', value: 'Completed' },
-								]}
-								error={errors.status}
-								onChange={(value) =>
-									setForm((current) => ({
-										...current,
-										status: value as TripInput['status'],
-									}))
-								}
+							<Controller
+								control={control}
+								name="status"
+								render={({ field: { onChange, value }, fieldState: { error } }) => (
+									<Field
+										label="Status"
+										id="trip-status"
+										value={value}
+										options={[
+											{ label: 'Scheduled', value: 'Scheduled' },
+											{ label: 'Boarding', value: 'Boarding' },
+											{ label: 'In Transit', value: 'In Transit' },
+											{ label: 'Completed', value: 'Completed' },
+										]}
+										error={error?.message}
+										onChange={onChange}
+									/>
+								)}
 							/>
 						</div>
 
@@ -227,7 +245,7 @@ export function TripsPage({ trips, vehicles, onAddTrip }: TripsPageProps) {
 							<button
 								className="button button--secondary"
 								type="button"
-								onClick={() => setForm(createTripForm(vehicles))}
+								onClick={() => reset(createTripForm(vehicles))}
 							>
 								Reset form
 							</button>
