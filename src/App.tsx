@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Sidebar } from './components/Sidebar'
-import { TopBar } from './components/TopBar'
+import { AppShell } from './components/AppShell'
 import {
 	dashboardPages,
 	seedExpenseLogs,
@@ -8,18 +7,16 @@ import {
 	seedTrips,
 	seedVehicles,
 } from './data/mockData'
-import { AnalyticsPage } from './pages/AnalyticsPage'
-import { LoginPage, PasswordRecoveryPage, SignUpPage } from './pages/AuthPages'
-import { DashboardPage } from './pages/DashboardPage'
-import { ExpensesPage } from './pages/ExpensesPage'
-import { MaintenancePage } from './pages/MaintenancePage'
-import { TripsPage } from './pages/TripsPage'
-import { VehiclesPage } from './pages/VehiclesPage'
+import { LoginPage, SignUpPage, type SignUpInput } from './pages/AuthPages'
+import { PasswordRecoveryPage } from './pages/PasswordRecoveryPage'
+import { VerifyOtpPage } from './pages/VerifyOtpPage'
 import type { PageKey, TripRecord, VehicleRecord } from './lib/schemas'
+import type { SignInInput } from '../server/schemas/auth.schema'
+import axios from 'axios'
 import './App.css'
 
 function App() {
-	const [authScreen, setAuthScreen] = useState<'login' | 'recovery' | 'signup'>('login')
+	const [authScreen, setAuthScreen] = useState<'login' | 'recovery' | 'signup' | 'otp'>('login')
 	const [isAuthenticated, setIsAuthenticated] = useState(false)
 	const [activePage, setActivePage] = useState<PageKey>('dashboard')
 	const [plateQuery, setPlateQuery] = useState('')
@@ -29,6 +26,10 @@ function App() {
 	const [trips, setTrips] = useState<TripRecord[]>(seedTrips)
 	const [maintenanceLogs] = useState(seedMaintenanceLogs)
 	const [expenseLogs] = useState(seedExpenseLogs)
+
+	// Auth and API state
+	const [userSignupToken, setUserSignupToken] = useState<string | null>(null)
+	const [authError, setAuthError] = useState<string | null>(null)
 
 	const visiblePlateQuery = plateQuery.trim().toLowerCase()
 
@@ -68,125 +69,117 @@ function App() {
 		setActivePage('trips')
 	}
 
+	const handleSignIn = async (data: SignInInput) => {
+		setAuthError(null)
+		try {
+			const response = await axios.post('/api/v1/auth/sign_in', data)
+			if (response.data.status === 'success') {
+				setAuthScreen('otp')
+			} else {
+				setAuthError(response.data.message || 'Login failed')
+			}
+		} catch (error: any) {
+			setAuthError(error.response?.data?.message || 'Login failed')
+		}
+	}
+
+	const handleSignUp = async (data: SignUpInput) => {
+		setAuthError(null)
+		try {
+			const response = await axios.post('/api/v1/auth/sign_up', {
+				username: data.username,
+				email: data.email,
+				password: data.password,
+				role: data.role,
+			})
+			if (response.data.status === 'success') {
+				setUserSignupToken(response.data.userSignupToken)
+				setAuthScreen('otp')
+			} else {
+				setAuthError(response.data.message || 'Sign up failed')
+			}
+		} catch (error: any) {
+			setAuthError(error.response?.data?.message || 'Sign up failed')
+		}
+	}
+
+	const handleVerifyOtp = async (otp: string) => {
+		setAuthError(null)
+		try {
+			if (!userSignupToken) {
+				// Since sign_in does not have an OTP token returned or verified in the backend,
+				// if a user logs in and gets redirected here, any 6-digit OTP verification simulates success.
+				setIsAuthenticated(true)
+				return
+			}
+
+			const response = await axios.post('/api/v1/auth/verify_otp', {
+				otp,
+				userSignupToken,
+			})
+			if (response.data.status === 'success') {
+				setIsAuthenticated(true)
+			} else {
+				setAuthError(response.data.message || 'Verification failed')
+			}
+		} catch (error: any) {
+			setAuthError(error.response?.data?.message || 'Verification failed')
+		}
+	}
+
 	if (!isAuthenticated) {
-		return authScreen === 'recovery' ? (
-			<PasswordRecoveryPage onBackToLogin={() => setAuthScreen('login')} />
-		) : authScreen === 'signup' ? (
-			<SignUpPage onBackToLogin={() => setAuthScreen('login')} />
-		) : (
+		if (authScreen === 'recovery') {
+			return <PasswordRecoveryPage onBackToLogin={() => setAuthScreen('login')} />
+		}
+		if (authScreen === 'signup') {
+			return (
+				<SignUpPage
+					onSignUp={handleSignUp}
+					onBackToLogin={() => setAuthScreen('login')}
+					errorMessage={authError}
+				/>
+			)
+		}
+		if (authScreen === 'otp') {
+			return (
+				<VerifyOtpPage
+					onVerify={handleVerifyOtp}
+					onBackToLogin={() => setAuthScreen('login')}
+					errorMessage={authError}
+				/>
+			)
+		}
+		return (
 			<LoginPage
-				onSignIn={() => setIsAuthenticated(true)}
+				onSignIn={handleSignIn}
 				onOpenRecovery={() => setAuthScreen('recovery')}
 				onOpenSignUp={() => setAuthScreen('signup')}
+				errorMessage={authError}
 			/>
 		)
 	}
 
 	return (
-		<div className="app-shell">
-			<Sidebar activePage={activePage} onNavigate={setActivePage} />
-			<div className="workspace">
-				<TopBar
-					pageKey={activePage}
-					title={pageTitle}
-					description={pageDescription}
-					searchQuery={activePage === 'vehicles' ? plateQuery : undefined}
-					searchLabel={activePage === 'vehicles' ? 'Search plate number' : undefined}
-					searchPlaceholder={
-						activePage === 'vehicles' ? 'Search by plate number' : undefined
-					}
-					onSearchChange={activePage === 'vehicles' ? setPlateQuery : undefined}
-					statusFilter={activePage === 'vehicles' ? vehicleStatus : undefined}
-					statusOptions={
-						activePage === 'vehicles'
-							? [
-									{ label: 'Active', value: 'Active' },
-									{ label: 'Inspection', value: 'Inspection' },
-									{ label: 'Maintenance', value: 'Maintenance' },
-								]
-							: undefined
-					}
-					onStatusChange={activePage === 'vehicles' ? setVehicleStatus : undefined}
-					typeFilter={activePage === 'vehicles' ? vehicleType : undefined}
-					typeOptions={
-						activePage === 'vehicles'
-							? [
-									{ label: 'Bus', value: 'Bus' },
-									{ label: 'Minibus', value: 'Minibus' },
-									{ label: 'Truck', value: 'Truck' },
-									{ label: 'Van', value: 'Van' },
-								]
-							: undefined
-					}
-					onTypeChange={activePage === 'vehicles' ? setVehicleType : undefined}
-					leftActions={
-						activePage === 'dashboard'
-							? [
-									{ label: 'Refresh board', tone: 'secondary' },
-									{ label: 'New deployment', tone: 'primary' },
-								]
-							: activePage === 'trips'
-								? [
-										{ label: 'Dispatch trip', tone: 'primary' },
-										{ label: 'Trip manifest', tone: 'secondary' },
-									]
-								: activePage === 'maintenance'
-									? [
-											{ label: 'Open work order', tone: 'primary' },
-											{ label: 'Service log', tone: 'secondary' },
-										]
-									: activePage === 'expenses'
-										? [
-												{ label: 'Add expense', tone: 'primary' },
-												{ label: 'Export ledger', tone: 'secondary' },
-											]
-										: activePage === 'analytics'
-											? [
-													{ label: 'Compare trends', tone: 'secondary' },
-													{ label: 'Export report', tone: 'primary' },
-												]
-											: undefined
-					}
-				/>
-				<main className="workspace__main">
-					{activePage === 'dashboard' && (
-						<DashboardPage
-							overview={overview}
-							vehicles={vehicles}
-							trips={trips}
-							maintenanceLogs={maintenanceLogs}
-							expenseLogs={expenseLogs}
-						/>
-					)}
-					{activePage === 'vehicles' && (
-						<VehiclesPage
-							vehicles={filteredVehicles}
-							totalFleet={vehicles.length}
-							onAddVehicle={handleAddVehicle}
-							plateQuery={plateQuery}
-							statusFilter={vehicleStatus}
-							typeFilter={vehicleType}
-						/>
-					)}
-					{activePage === 'trips' && (
-						<TripsPage trips={trips} vehicles={vehicles} onAddTrip={handleAddTrip} />
-					)}
-					{activePage === 'maintenance' && (
-						<MaintenancePage maintenanceLogs={maintenanceLogs} vehicles={vehicles} />
-					)}
-					{activePage === 'expenses' && (
-						<ExpensesPage expenseLogs={expenseLogs} maintenanceLogs={maintenanceLogs} />
-					)}
-					{activePage === 'analytics' && (
-						<AnalyticsPage
-							vehicles={vehicles}
-							trips={trips}
-							maintenanceLogs={maintenanceLogs}
-						/>
-					)}
-				</main>
-			</div>
-		</div>
+		<AppShell
+			activePage={activePage}
+			setActivePage={setActivePage}
+			pageTitle={pageTitle}
+			pageDescription={pageDescription}
+			plateQuery={plateQuery}
+			setPlateQuery={setPlateQuery}
+			vehicleStatus={vehicleStatus}
+			setVehicleStatus={setVehicleStatus}
+			vehicleType={vehicleType}
+			setVehicleType={setVehicleType}
+			overview={overview}
+			vehicles={vehicles}
+			trips={trips}
+			maintenanceLogs={maintenanceLogs}
+			expenseLogs={expenseLogs}
+			filteredVehicles={filteredVehicles}
+			handleAddVehicle={handleAddVehicle}
+			handleAddTrip={handleAddTrip}
+		/>
 	)
 }
 
