@@ -23,6 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 .github/*
+ref_docs/*
 
 # Enviroment
 .env
