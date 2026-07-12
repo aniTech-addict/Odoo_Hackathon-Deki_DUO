@@ -1,0 +1,33 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  email        String   @unique
+  avatar       String?
+  password     String
+  refreshToken String?
+  type         String   @default("user")
+  role         String   @default("user")
+  isVerified   Boolean  @default(false)
+  otpId        String?  @unique
+  otp          Otp?     @relation(fields: [otpId], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Otp {
+  id        String   @id @default(cuid())
+  otp       String
+  expireAt  DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User?
+}
