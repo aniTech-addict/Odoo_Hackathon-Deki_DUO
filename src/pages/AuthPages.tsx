@@ -115,15 +115,6 @@ export function LoginPage({ onSignIn, onOpenRecovery, onOpenSignUp }: LoginPageP
 							Create an account
 						</button>
 					</form>
-
-					<div className="auth-card__footer">
-						<p>No backend authentication calls are made in this demo.</p>
-					</div>
-				</div>
-
-				<div className="auth-note">
-					<strong>Authorized personnel only.</strong>
-					<span>This frontend preview keeps login interactions self-contained.</span>
 				</div>
 			</section>
 		</main>
