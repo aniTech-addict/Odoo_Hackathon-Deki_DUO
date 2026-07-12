@@ -11,23 +11,36 @@ export const pageSchema = z.enum([
 
 export type PageKey = z.infer<typeof pageSchema>
 
+export const capacitySchema = z.object({
+	amount: z.coerce.number().positive('Capacity amount must be a positive number'),
+	unit: z.enum(['kg', 'ton'], {
+		message: "Capacity unit must be either 'kg' or 'ton'",
+	}),
+})
+
+export const costSchema = z.object({
+	amount: z.coerce.number().nonnegative('Cost must be a non-negative number'),
+	currency: z.enum(['dollars', 'rupees'], {
+		message: "Currency must be either 'dollars' or 'rupees'",
+	}).default('rupees'),
+})
+
 export const vehicleSchema = z.object({
-	plate: z.string().min(5, 'Enter a valid plate number').max(12),
-	vehicleType: z.enum(['Bus', 'Minibus', 'Truck', 'Van']),
-	driver: z.string().min(3, 'Assign a driver'),
-	route: z.string().min(3, 'Add a route or depot reference'),
-	status: z.enum(['Active', 'Inspection', 'Maintenance']),
-	mileage: z.coerce.number().int().nonnegative('Mileage cannot be negative'),
-	nextService: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD'),
-	utilization: z.coerce.number().min(0).max(100),
+	registrationNumber: z.string().min(1, 'Registration number is required'),
+	model: z.string().min(1, 'Model name is required'),
+	type: z.array(z.string()).min(1, 'At least one vehicle type must be selected'),
+	capacity: capacitySchema,
+	odometer: z.coerce.number().nonnegative('Odometer reading must be a non-negative number'),
+	acquirementCost: costSchema,
+	status: z.enum(['available', 'on trip', 'in shop', 'retired'], {
+		message: "Status must be: 'available', 'on trip', 'in shop', or 'retired'",
+	}).default('available'),
 })
 
 export type VehicleInput = z.infer<typeof vehicleSchema>
 
 export type VehicleRecord = VehicleInput & {
-	id: string
-	vehicleType: VehicleInput['vehicleType']
-	status: VehicleInput['status']
+	_id: string
 }
 
 export const tripSchema = z.object({
@@ -37,33 +50,42 @@ export const tripSchema = z.object({
 	vehiclePlate: z.string().min(5, 'Pick a vehicle'),
 	driver: z.string().min(3, 'Assign a driver'),
 	departure: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM'),
-	load: z.coerce.number().positive('Load must be positive'),
-	status: z.enum(['Scheduled', 'Boarding', 'In Transit', 'Completed']),
+	cargoWeight: z.coerce.number().positive('Cargo weight must be positive'),
+	plannedDistance: z.coerce.number().positive('Planned distance must be positive'),
+	status: z.enum(['Draft', 'Dispatched', 'Completed', 'Cancelled']).default('Draft'),
+	progress: z.coerce.number().min(0).max(100).default(0),
 })
 
 export type TripInput = z.infer<typeof tripSchema>
 
 export type TripRecord = TripInput & {
-	id: string
-	progress: number
+	_id: string
 }
 
 export const maintenanceSchema = z.object({
-	title: z.string().min(3),
-	asset: z.string().min(3),
-	status: z.enum(['Scheduled', 'In Service', 'Complete']),
-	cost: z.coerce.number().nonnegative(),
-	nextCheck: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+	title: z.string().min(3, 'Title must be at least 3 characters'),
+	asset: z.string().min(3, 'Asset plate or reference is required'),
+	status: z.enum(['Scheduled', 'In Service', 'Complete']).default('Scheduled'),
+	cost: z.coerce.number().nonnegative('Cost cannot be negative'),
+	nextCheck: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD'),
 })
 
-export type MaintenanceRecord = z.infer<typeof maintenanceSchema> & { id: string }
+export type MaintenanceInput = z.infer<typeof maintenanceSchema>
+
+export type MaintenanceRecord = MaintenanceInput & {
+	_id: string
+}
 
 export const expenseSchema = z.object({
-	category: z.string().min(3),
-	asset: z.string().min(3),
-	amount: z.coerce.number().positive(),
-	date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-	note: z.string().min(3),
+	category: z.string().min(3, 'Category must be at least 3 characters'),
+	asset: z.string().min(3, 'Asset must be at least 3 characters'),
+	amount: z.coerce.number().positive('Amount must be positive'),
+	date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD'),
+	note: z.string().min(3, 'Note must be at least 3 characters'),
 })
 
-export type ExpenseRecord = z.infer<typeof expenseSchema> & { id: string }
+export type ExpenseInput = z.infer<typeof expenseSchema>
+
+export type ExpenseRecord = ExpenseInput & {
+	_id: string
+}

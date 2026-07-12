@@ -31,7 +31,7 @@ export function MaintenancePage({ maintenanceLogs, vehicles }: MaintenancePagePr
 				/>
 				<StatCard
 					label="Ready fleet"
-					value={String(vehicles.filter((vehicle) => vehicle.status === 'Active').length)}
+					value={String(vehicles.filter((vehicle) => vehicle.status === 'available').length)}
 					meta="Vehicles available for dispatch"
 					icon="fleet"
 					tone="success"
@@ -73,7 +73,7 @@ export function MaintenancePage({ maintenanceLogs, vehicles }: MaintenancePagePr
 				>
 					<div className="list">
 						{maintenanceLogs.map((log) => (
-							<div key={log.id} className="list__item">
+							<div key={log._id} className="list__item">
 								<div>
 									<strong>{log.asset}</strong>
 									<p>{log.title}</p>

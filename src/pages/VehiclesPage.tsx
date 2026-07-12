@@ -11,28 +11,27 @@ import { vehicleSchema, type VehicleInput, type VehicleRecord } from '../lib/sch
 type VehiclesPageProps = {
 	vehicles: VehicleRecord[]
 	totalFleet: number
-	onAddVehicle: (vehicle: VehicleRecord) => void
-	plateQuery: string
+	onAddVehicle: (vehicle: VehicleInput) => void
+	registrationQuery: string
 	statusFilter: string
 	typeFilter: string
 }
 
 const createVehicleForm = (): VehicleInput => ({
-	plate: '',
-	vehicleType: 'Bus',
-	driver: '',
-	route: '',
-	status: 'Active',
-	mileage: 0,
-	nextService: '',
-	utilization: 60,
+	registrationNumber: '',
+	model: '',
+	type: ['Bus'],
+	capacity: { amount: 0, unit: 'kg' },
+	odometer: 0,
+	acquirementCost: { amount: 0, currency: 'rupees' },
+	status: 'available',
 })
 
 export function VehiclesPage({
 	vehicles,
 	totalFleet,
 	onAddVehicle,
-	plateQuery,
+	registrationQuery,
 	statusFilter,
 	typeFilter,
 }: VehiclesPageProps) {
@@ -46,21 +45,22 @@ export function VehiclesPage({
 	})
 
 	const activeCount = useMemo(
-		() => vehicles.filter((vehicle) => vehicle.status === 'Active').length,
+		() => vehicles.filter((vehicle) => vehicle.status === 'available').length,
 		[vehicles]
 	)
 	const serviceCount = useMemo(
-		() => vehicles.filter((vehicle) => vehicle.status === 'Maintenance').length,
+		() => vehicles.filter((vehicle) => vehicle.status === 'in shop').length,
 		[vehicles]
 	)
 
 	const onSubmit = (data: VehicleInput) => {
-		const vehicle: VehicleRecord = {
+		// Type field in form is a string if it's a simple select, but schema expects an array.
+		// If we use a simple select, we need to ensure it's an array.
+		const payload = {
 			...data,
-			id: `VEH-${Date.now().toString().slice(-5)}`,
+			type: Array.isArray(data.type) ? data.type : [data.type],
 		}
-
-		onAddVehicle(vehicle)
+		onAddVehicle(payload)
 		reset(createVehicleForm())
 	}
 
@@ -75,14 +75,14 @@ export function VehiclesPage({
 					tone="neutral"
 				/>
 				<StatCard
-					label="Active vehicles"
+					label="Available vehicles"
 					value={String(activeCount)}
 					meta="Ready for dispatch"
 					icon="truck"
 					tone="success"
 				/>
 				<StatCard
-					label="Maintenance bay"
+					label="In shop"
 					value={String(serviceCount)}
 					meta="Vehicles awaiting service"
 					icon="wrench"
@@ -92,7 +92,7 @@ export function VehiclesPage({
 					label="Search matches"
 					value={String(vehicles.length)}
 					meta={
-						plateQuery || statusFilter || typeFilter
+						registrationQuery || statusFilter || typeFilter
 							? 'Filtered by top bar controls'
 							: 'All vehicles visible'
 					}
@@ -104,21 +104,21 @@ export function VehiclesPage({
 			<div className="layout-grid layout-grid--two">
 				<SectionCard
 					title="Fleet registry"
-					subtitle="Current vehicle inventory with status and service windows."
+					subtitle="Current vehicle inventory with status and details."
 					className="table-card"
 				>
 					<DataTable
 						rows={vehicles}
 						columns={[
-							{ head: 'Plate', render: (vehicle) => vehicle.plate },
-							{ head: 'Type', render: (vehicle) => vehicle.vehicleType },
-							{ head: 'Driver', render: (vehicle) => vehicle.driver },
+							{ head: 'Registration', render: (vehicle) => vehicle.registrationNumber },
+							{ head: 'Model', render: (vehicle) => vehicle.model },
+							{ head: 'Type', render: (vehicle) => vehicle.type.join(', ') },
 							{
 								head: 'Status',
 								render: (vehicle) => <StatusBadge status={vehicle.status} />,
 							},
-							{ head: 'Utilization', render: (vehicle) => `${vehicle.utilization}%` },
-							{ head: 'Next service', render: (vehicle) => vehicle.nextService },
+							{ head: 'Odometer', render: (vehicle) => String(vehicle.odometer) },
+							{ head: 'Capacity', render: (vehicle) => `${vehicle.capacity.amount} ${vehicle.capacity.unit}` },
 						]}
 						emptyState="No vehicles match the current filter"
 					/>
@@ -132,11 +132,11 @@ export function VehiclesPage({
 						<div className="field-grid">
 							<Controller
 								control={control}
-								name="plate"
+								name="registrationNumber"
 								render={({ field: { onChange, value }, fieldState: { error } }) => (
 									<Field
-										label="Plate"
-										id="vehicle-plate"
+										label="Registration Number"
+										id="vehicle-reg"
 										placeholder="KDA-112A"
 										value={value}
 										error={error?.message}
@@ -146,12 +146,26 @@ export function VehiclesPage({
 							/>
 							<Controller
 								control={control}
-								name="vehicleType"
+								name="model"
+								render={({ field: { onChange, value }, fieldState: { error } }) => (
+									<Field
+										label="Model"
+										id="vehicle-model"
+										placeholder="Toyota Hiace"
+										value={value}
+										error={error?.message}
+										onChange={onChange}
+									/>
+								)}
+							/>
+							<Controller
+								control={control}
+								name="type"
 								render={({ field: { onChange, value }, fieldState: { error } }) => (
 									<Field
 										label="Vehicle type"
 										id="vehicle-type"
-										value={value}
+										value={Array.isArray(value) ? value[0] : value}
 										options={[
 											{ label: 'Bus', value: 'Bus' },
 											{ label: 'Minibus', value: 'Minibus' },
@@ -159,45 +173,17 @@ export function VehiclesPage({
 											{ label: 'Van', value: 'Van' },
 										]}
 										error={error?.message}
-										onChange={onChange}
+										onChange={(val) => onChange([val])}
 									/>
 								)}
 							/>
 							<Controller
 								control={control}
-								name="driver"
+								name="odometer"
 								render={({ field: { onChange, value }, fieldState: { error } }) => (
 									<Field
-										label="Driver"
-										id="vehicle-driver"
-										placeholder="Assigned driver"
-										value={value}
-										error={error?.message}
-										onChange={onChange}
-									/>
-								)}
-							/>
-							<Controller
-								control={control}
-								name="route"
-								render={({ field: { onChange, value }, fieldState: { error } }) => (
-									<Field
-										label="Route"
-										id="vehicle-route"
-										placeholder="Central loop"
-										value={value}
-										error={error?.message}
-										onChange={onChange}
-									/>
-								)}
-							/>
-							<Controller
-								control={control}
-								name="mileage"
-								render={({ field: { onChange, value }, fieldState: { error } }) => (
-									<Field
-										label="Mileage"
-										id="vehicle-mileage"
+										label="Odometer"
+										id="vehicle-odometer"
 										type="number"
 										value={value}
 										error={error?.message}
@@ -207,13 +193,30 @@ export function VehiclesPage({
 							/>
 							<Controller
 								control={control}
-								name="nextService"
+								name="capacity.amount"
 								render={({ field: { onChange, value }, fieldState: { error } }) => (
 									<Field
-										label="Next service"
-										id="vehicle-next-service"
-										type="date"
+										label="Capacity Amount"
+										id="vehicle-capacity-amount"
+										type="number"
 										value={value}
+										error={error?.message}
+										onChange={(val) => onChange(Number(val))}
+									/>
+								)}
+							/>
+							<Controller
+								control={control}
+								name="capacity.unit"
+								render={({ field: { onChange, value }, fieldState: { error } }) => (
+									<Field
+										label="Capacity Unit"
+										id="vehicle-capacity-unit"
+										value={value}
+										options={[
+											{ label: 'kg', value: 'kg' },
+											{ label: 'ton', value: 'ton' },
+										]}
 										error={error?.message}
 										onChange={onChange}
 									/>
@@ -221,11 +224,11 @@ export function VehiclesPage({
 							/>
 							<Controller
 								control={control}
-								name="utilization"
+								name="acquirementCost.amount"
 								render={({ field: { onChange, value }, fieldState: { error } }) => (
 									<Field
-										label="Utilization"
-										id="vehicle-utilization"
+										label="Acquirement Cost"
+										id="vehicle-cost"
 										type="number"
 										value={value}
 										error={error?.message}
@@ -242,9 +245,10 @@ export function VehiclesPage({
 										id="vehicle-status"
 										value={value}
 										options={[
-											{ label: 'Active', value: 'Active' },
-											{ label: 'Inspection', value: 'Inspection' },
-											{ label: 'Maintenance', value: 'Maintenance' },
+											{ label: 'available', value: 'available' },
+											{ label: 'on trip', value: 'on trip' },
+											{ label: 'in shop', value: 'in shop' },
+											{ label: 'retired', value: 'retired' },
 										]}
 										error={error?.message}
 										onChange={onChange}

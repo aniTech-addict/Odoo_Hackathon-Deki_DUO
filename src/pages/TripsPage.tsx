@@ -10,18 +10,20 @@ import { tripSchema, type TripInput, type TripRecord, type VehicleRecord } from 
 type TripsPageProps = {
 	trips: TripRecord[]
 	vehicles: VehicleRecord[]
-	onAddTrip: (trip: TripRecord) => void
+	onAddTrip: (trip: TripInput) => void
 }
 
 const createTripForm = (vehicles: VehicleRecord[]): TripInput => ({
 	route: '',
 	origin: '',
 	destination: '',
-	vehiclePlate: vehicles[0]?.plate ?? '',
-	driver: vehicles[0]?.driver ?? '',
+	vehiclePlate: vehicles[0]?.registrationNumber ?? '',
+	driver: '',
 	departure: '',
-	load: 0,
-	status: 'Scheduled',
+	cargoWeight: 0,
+	plannedDistance: 0,
+	status: 'Draft',
+	progress: 0,
 })
 
 export function TripsPage({ trips, vehicles, onAddTrip }: TripsPageProps) {
@@ -35,14 +37,10 @@ export function TripsPage({ trips, vehicles, onAddTrip }: TripsPageProps) {
 		defaultValues: createTripForm(vehicles),
 	})
 
-	const activeTrips = trips.filter((trip) => trip.status !== 'Completed').length
+	const activeTrips = trips.filter((trip) => trip.status === 'Dispatched').length
 
 	const onSubmit = (data: TripInput) => {
-		onAddTrip({
-			...data,
-			id: `TRP-${Date.now().toString().slice(-5)}`,
-			progress: 10,
-		})
+		onAddTrip(data)
 		reset(createTripForm(vehicles))
 	}
 
@@ -52,28 +50,28 @@ export function TripsPage({ trips, vehicles, onAddTrip }: TripsPageProps) {
 				<StatCard
 					label="Active trips"
 					value={String(activeTrips)}
-					meta="Currently not completed"
+					meta="Currently dispatched"
 					icon="route"
 					tone="success"
 				/>
 				<StatCard
-					label="Scheduled"
-					value={String(trips.filter((trip) => trip.status === 'Scheduled').length)}
+					label="Draft"
+					value={String(trips.filter((trip) => trip.status === 'Draft').length)}
 					meta="Awaiting dispatch"
 					icon="truck"
 					tone="warning"
 				/>
 				<StatCard
-					label="Board count"
+					label="Total Trips"
 					value={String(trips.length)}
-					meta="All trips currently on the board"
+					meta="All trips currently recorded"
 					icon="chart"
 					tone="neutral"
 				/>
 				<StatCard
-					label="Average load"
-					value={`${Math.round(trips.reduce((sum, trip) => sum + trip.load, 0) / Math.max(trips.length, 1))}%`}
-					meta="Estimated capacity usage"
+					label="Average Weight"
+					value={`${Math.round(trips.reduce((sum, trip) => sum + trip.cargoWeight, 0) / Math.max(trips.length, 1))} kg`}
+					meta="Estimated cargo weight"
 					icon="wallet"
 					tone="neutral"
 				/>
@@ -96,7 +94,7 @@ export function TripsPage({ trips, vehicles, onAddTrip }: TripsPageProps) {
 								head: 'Status',
 								render: (trip) => <StatusBadge status={trip.status} />,
 							},
-							{ head: 'Load', render: (trip) => `${trip.load}%` },
+							{ head: 'Progress', render: (trip) => `${trip.progress}%` },
 						]}
 						emptyState="No trips match the current filter"
 					/>
@@ -174,18 +172,10 @@ export function TripsPage({ trips, vehicles, onAddTrip }: TripsPageProps) {
 										value={value}
 										error={error?.message}
 										options={vehicles.map((vehicle) => ({
-											label: vehicle.plate,
-											value: vehicle.plate,
+											label: vehicle.registrationNumber,
+											value: vehicle.registrationNumber,
 										}))}
-										onChange={(val) => {
-											onChange(val)
-											const matchedVehicle = vehicles.find(
-												(vehicle) => vehicle.plate === val
-											)
-											if (matchedVehicle?.driver) {
-												setValue('driver', matchedVehicle.driver, { shouldValidate: true })
-											}
-										}}
+										onChange={onChange}
 									/>
 								)}
 							/>
@@ -205,11 +195,39 @@ export function TripsPage({ trips, vehicles, onAddTrip }: TripsPageProps) {
 							/>
 							<Controller
 								control={control}
-								name="load"
+								name="cargoWeight"
 								render={({ field: { onChange, value }, fieldState: { error } }) => (
 									<Field
-										label="Load (%)"
-										id="trip-load"
+										label="Cargo Weight"
+										id="trip-cargoweight"
+										type="number"
+										value={value}
+										error={error?.message}
+										onChange={(val) => onChange(Number(val))}
+									/>
+								)}
+							/>
+							<Controller
+								control={control}
+								name="plannedDistance"
+								render={({ field: { onChange, value }, fieldState: { error } }) => (
+									<Field
+										label="Planned Distance"
+										id="trip-distance"
+										type="number"
+										value={value}
+										error={error?.message}
+										onChange={(val) => onChange(Number(val))}
+									/>
+								)}
+							/>
+							<Controller
+								control={control}
+								name="progress"
+								render={({ field: { onChange, value }, fieldState: { error } }) => (
+									<Field
+										label="Progress (%)"
+										id="trip-progress"
 										type="number"
 										value={value}
 										error={error?.message}
@@ -226,10 +244,10 @@ export function TripsPage({ trips, vehicles, onAddTrip }: TripsPageProps) {
 										id="trip-status"
 										value={value}
 										options={[
-											{ label: 'Scheduled', value: 'Scheduled' },
-											{ label: 'Boarding', value: 'Boarding' },
-											{ label: 'In Transit', value: 'In Transit' },
+											{ label: 'Draft', value: 'Draft' },
+											{ label: 'Dispatched', value: 'Dispatched' },
 											{ label: 'Completed', value: 'Completed' },
+											{ label: 'Cancelled', value: 'Cancelled' },
 										]}
 										error={error?.message}
 										onChange={onChange}
