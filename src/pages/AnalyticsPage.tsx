@@ -54,6 +54,7 @@ export function AnalyticsPage({ vehicles, trips, maintenanceLogs }: AnalyticsPag
 					title="Performance summary"
 					subtitle="A compact operational pulse for leadership and dispatch."
 				>
+					me
 					<div className="list">
 						<div className="list__item">
 							<div>

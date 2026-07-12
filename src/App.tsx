@@ -9,7 +9,7 @@ import {
 	seedVehicles,
 } from './data/mockData'
 import { AnalyticsPage } from './pages/AnalyticsPage'
-import { LoginPage, PasswordRecoveryPage } from './pages/AuthPages'
+import { LoginPage, PasswordRecoveryPage, SignUpPage } from './pages/AuthPages'
 import { DashboardPage } from './pages/DashboardPage'
 import { ExpensesPage } from './pages/ExpensesPage'
 import { MaintenancePage } from './pages/MaintenancePage'
@@ -19,7 +19,7 @@ import type { PageKey, TripRecord, VehicleRecord } from './lib/schemas'
 import './App.css'
 
 function App() {
-	const [authScreen, setAuthScreen] = useState<'login' | 'recovery'>('login')
+	const [authScreen, setAuthScreen] = useState<'login' | 'recovery' | 'signup'>('login')
 	const [isAuthenticated, setIsAuthenticated] = useState(false)
 	const [activePage, setActivePage] = useState<PageKey>('dashboard')
 	const [plateQuery, setPlateQuery] = useState('')
@@ -71,10 +71,13 @@ function App() {
 	if (!isAuthenticated) {
 		return authScreen === 'recovery' ? (
 			<PasswordRecoveryPage onBackToLogin={() => setAuthScreen('login')} />
+		) : authScreen === 'signup' ? (
+			<SignUpPage onBackToLogin={() => setAuthScreen('login')} />
 		) : (
 			<LoginPage
 				onSignIn={() => setIsAuthenticated(true)}
 				onOpenRecovery={() => setAuthScreen('recovery')}
+				onOpenSignUp={() => setAuthScreen('signup')}
 			/>
 		)
 	}
