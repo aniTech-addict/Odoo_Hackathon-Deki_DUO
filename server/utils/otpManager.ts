@@ -22,7 +22,7 @@ async function sendOtp(otp: number, email: string) {
 }
 
 async function generateOtp(email: string) {
-	const otp = Math.floor(10031 + Math.random() * 87537)
+	const otp = Math.floor(100000 + Math.random() * 900000)
 	const hashedOtp = await bcrypt.hash(String(otp), 10)
 	await sendOtp(otp, email)
 	return hashedOtp
