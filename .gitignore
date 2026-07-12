@@ -24,6 +24,7 @@ dist-ssr
 *.sw?
 .github/*
 ref_docs/*
+frontend_reference/*
 
 # Enviroment
 .env
