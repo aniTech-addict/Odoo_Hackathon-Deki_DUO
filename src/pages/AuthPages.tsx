@@ -1,33 +1,42 @@
-import { useState, type FormEvent } from 'react'
+import { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import {
+	authCredentialsSchema,
+	signUpSchema,
+	type SignInInput,
+} from '../../server/schemas/auth.schema'
 
 type LoginPageProps = {
-	onSignIn: () => void
+	onSignIn: (data: SignInInput) => void
 	onOpenRecovery: () => void
 	onOpenSignUp: () => void
+	errorMessage?: string | null
 }
 
-type PasswordRecoveryPageProps = {
-	onBackToLogin: () => void
-}
 
 type SignUpPageProps = {
+	onSignUp: (data: SignUpInput) => void
 	onBackToLogin: () => void
+	errorMessage?: string | null
 }
 
-export function LoginPage({ onSignIn, onOpenRecovery, onOpenSignUp }: LoginPageProps) {
-	const [email, setEmail] = useState('')
-	const [password, setPassword] = useState('')
-	const [role, setRole] = useState('Fleet Manager')
-	const [rememberSession, setRememberSession] = useState(true)
+export function LoginPage({ onSignIn, onOpenRecovery, onOpenSignUp, errorMessage }: LoginPageProps) {
+	const {
+		register,
+		handleSubmit,
+		formState: { errors },
+	} = useForm<SignInInput>({
+		resolver: zodResolver(authCredentialsSchema),
+		defaultValues: {
+			username: '',
+			password: '',
+		},
+	})
 
-	const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-		event.preventDefault()
-
-		if (!email.trim() || !password.trim()) {
-			return
-		}
-
-		onSignIn()
+	const onSubmit = (data: SignInInput) => {
+		onSignIn(data)
 	}
 
 	return (
@@ -50,27 +59,15 @@ export function LoginPage({ onSignIn, onOpenRecovery, onOpenSignUp }: LoginPageP
 						</p>
 					</div>
 
-					<form className="auth-form" onSubmit={handleSubmit}>
+					<form className="auth-form" onSubmit={handleSubmit(onSubmit)}>
 						<label className="field auth-field">
-							<span>Access Role</span>
-							<select value={role} onChange={(event) => setRole(event.target.value)}>
-								<option value="Fleet Manager">Fleet Manager</option>
-								<option value="Driver">Driver</option>
-								<option value="Safety Officer">Safety Officer</option>
-								<option value="Financial Analyst">Financial Analyst</option>
-							</select>
-						</label>
-
-						<label className="field auth-field">
-							<span>Operator Email</span>
+							<span>Operator Username</span>
 							<input
-								autoComplete="email"
-								name="email"
-								placeholder="name@transitops.com"
-								type="email"
-								value={email}
-								onChange={(event) => setEmail(event.target.value)}
+								placeholder="Username"
+								type="text"
+								{...register('username')}
 							/>
+							{errors.username && <div className="field__error">{errors.username.message}</div>}
 						</label>
 
 						<label className="field auth-field">
@@ -86,22 +83,18 @@ export function LoginPage({ onSignIn, onOpenRecovery, onOpenSignUp }: LoginPageP
 							</div>
 							<input
 								autoComplete="current-password"
-								name="password"
 								placeholder="••••••••"
 								type="password"
-								value={password}
-								onChange={(event) => setPassword(event.target.value)}
+								{...register('password')}
 							/>
+							{errors.password && <div className="field__error">{errors.password.message}</div>}
 						</label>
 
-						<label className="auth-check">
-							<input
-								checked={rememberSession}
-								type="checkbox"
-								onChange={(event) => setRememberSession(event.target.checked)}
-							/>
-							<span>Maintain active session on this terminal</span>
-						</label>
+						{errorMessage && (
+							<div className="field__error" style={{ textAlign: 'center', marginBottom: '1rem' }}>
+								{errorMessage}
+							</div>
+						)}
 
 						<button className="button button--primary auth-submit" type="submit">
 							Secure Sign In
@@ -121,19 +114,35 @@ export function LoginPage({ onSignIn, onOpenRecovery, onOpenSignUp }: LoginPageP
 	)
 }
 
-export function SignUpPage({ onBackToLogin }: SignUpPageProps) {
-	const [email, setEmail] = useState('')
-	const [password, setPassword] = useState('')
-	const [confirmPassword, setConfirmPassword] = useState('')
+const frontendSignUpSchema = signUpSchema
+	.extend({
+		confirmPassword: z.string().min(1, 'Please confirm your password'),
+	})
+	.refine((data) => data.password === data.confirmPassword, {
+		message: "Passwords don't match",
+		path: ['confirmPassword'],
+	})
 
-	const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-		event.preventDefault()
+export type SignUpInput = z.infer<typeof frontendSignUpSchema>
 
-		if (!email.trim() || !password.trim() || password !== confirmPassword) {
-			return
-		}
+export function SignUpPage({ onSignUp, onBackToLogin, errorMessage }: SignUpPageProps) {
+	const {
+		register,
+		handleSubmit,
+		formState: { errors },
+	} = useForm<SignUpInput>({
+		resolver: zodResolver(frontendSignUpSchema),
+		defaultValues: {
+			username: '',
+			email: '',
+			password: '',
+			confirmPassword: '',
+			role: 'Fleet Manager',
+		},
+	})
 
-		onBackToLogin()
+	const onSubmit = (data: SignUpInput) => {
+		onSignUp(data)
 	}
 
 	return (
@@ -156,42 +165,68 @@ export function SignUpPage({ onBackToLogin }: SignUpPageProps) {
 						</p>
 					</div>
 
-					<form className="auth-form" onSubmit={handleSubmit}>
+					<form className="auth-form" onSubmit={handleSubmit(onSubmit)}>
+						<label className="field auth-field">
+							<span>Username</span>
+							<input
+								placeholder="Username"
+								type="text"
+								{...register('username')}
+							/>
+							{errors.username && <div className="field__error">{errors.username.message}</div>}
+						</label>
+
 						<label className="field auth-field">
 							<span>Email Address</span>
 							<input
 								autoComplete="email"
-								name="email"
 								placeholder="name@transitops.com"
 								type="email"
-								value={email}
-								onChange={(event) => setEmail(event.target.value)}
+								{...register('email')}
 							/>
+							{errors.email && <div className="field__error">{errors.email.message}</div>}
+						</label>
+
+						<label className="field auth-field">
+							<span>Access Role</span>
+							<select {...register('role')}>
+								<option value="Fleet Manager">Fleet Manager</option>
+								<option value="Dispatcher">Dispatcher</option>
+								<option value="Safety Officer">Safety Officer</option>
+								<option value="Financial Analyst">Financial Analyst</option>
+							</select>
+							{errors.role && <div className="field__error">{errors.role.message}</div>}
 						</label>
 
 						<label className="field auth-field">
 							<span>Security Credential</span>
 							<input
 								autoComplete="new-password"
-								name="password"
 								placeholder="••••••••"
 								type="password"
-								value={password}
-								onChange={(event) => setPassword(event.target.value)}
+								{...register('password')}
 							/>
+							{errors.password && <div className="field__error">{errors.password.message}</div>}
 						</label>
 
 						<label className="field auth-field">
 							<span>Confirm Security Credential</span>
 							<input
 								autoComplete="new-password"
-								name="confirm-password"
 								placeholder="••••••••"
 								type="password"
-								value={confirmPassword}
-								onChange={(event) => setConfirmPassword(event.target.value)}
+								{...register('confirmPassword')}
 							/>
+							{errors.confirmPassword && (
+								<div className="field__error">{errors.confirmPassword.message}</div>
+							)}
 						</label>
+
+						{errorMessage && (
+							<div className="field__error" style={{ textAlign: 'center', marginBottom: '1rem' }}>
+								{errorMessage}
+							</div>
+						)}
 
 						<button className="button button--primary auth-submit" type="submit">
 							Create Account
@@ -214,100 +249,6 @@ export function SignUpPage({ onBackToLogin }: SignUpPageProps) {
 				<div className="auth-note">
 					<strong>Authorized personnel only.</strong>
 					<span>This frontend preview keeps signup interactions self-contained.</span>
-				</div>
-			</section>
-		</main>
-	)
-}
-
-export function PasswordRecoveryPage({ onBackToLogin }: PasswordRecoveryPageProps) {
-	const [email, setEmail] = useState('')
-	const [sent, setSent] = useState(false)
-
-	const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-		event.preventDefault()
-
-		if (!email.trim()) {
-			return
-		}
-
-		setSent(true)
-	}
-
-	return (
-		<main className="auth-shell auth-shell--recovery">
-			<section className="auth-panel auth-panel--recovery">
-				<div className="auth-panel__brand">
-					<div className="auth-panel__brand-mark">TO</div>
-					<div>
-						<p className="auth-panel__eyebrow">TransitOps</p>
-						<h1>Password Recovery</h1>
-					</div>
-				</div>
-
-				<div className="auth-card">
-					<div className="auth-card__header">
-						<h2>{sent ? 'Verify Identity' : 'Forgot Password'}</h2>
-						<p>
-							{sent
-								? 'Enter the local verification code sent to your registered TransitOps email.'
-								: 'Enter your registered email address to receive a local recovery code.'}
-						</p>
-					</div>
-
-					{sent ? (
-						<div className="auth-form auth-form--recovery">
-							<div className="auth-otp-grid" aria-label="Recovery code inputs">
-								{Array.from({ length: 6 }).map((_, index) => (
-									<input
-										key={index}
-										aria-label={`Digit ${index + 1}`}
-										maxLength={1}
-										type="text"
-									/>
-								))}
-							</div>
-							<button className="button button--primary auth-submit" type="button">
-								Verify OTP
-							</button>
-							<button
-								className="auth-link auth-link--center"
-								type="button"
-								onClick={onBackToLogin}
-							>
-								Change email
-							</button>
-						</div>
-					) : (
-						<form className="auth-form" onSubmit={handleSubmit}>
-							<label className="field auth-field">
-								<span>Email Address</span>
-								<input
-									autoComplete="email"
-									name="recovery-email"
-									placeholder="e.g. ops_manager@transitops.com"
-									type="email"
-									value={email}
-									onChange={(event) => setEmail(event.target.value)}
-								/>
-							</label>
-							<button className="button button--primary auth-submit" type="submit">
-								Get OTP
-							</button>
-							<button
-								className="auth-link auth-link--center"
-								type="button"
-								onClick={onBackToLogin}
-							>
-								Back to login
-							</button>
-						</form>
-					)}
-				</div>
-
-				<div className="auth-note">
-					<strong>Security notice.</strong>
-					<span>Recovery codes are simulated locally and never sent to a backend.</span>
 				</div>
 			</section>
 		</main>

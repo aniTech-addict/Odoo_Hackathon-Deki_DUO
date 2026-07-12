@@ -6,27 +6,20 @@ import { z } from 'zod'
 import jwt from 'jsonwebtoken'
 import { JWT_ACCESS_SECRET } from '../configs/env.js'
 import { createMail, sendMail } from '../utils/sendMail.js'
-
-const authCredentialsSchema = z.object({
-	username: z.string().min(1, 'Username is required'),
-	password: z.string().min(1, 'Password is required'),
-})
-
-const signUpSchema = authCredentialsSchema.extend({
-	email: z.email('Invalid email format'),
-	role: z.enum(['Fleet Manager', 'Dispatcher', 'Safety Officer', 'Financial Analyst'], {
-		message: 'Role must be one of: Fleet Manager, Dispatcher, Safety Officer, Financial Analyst',
-	}),
-})
+import {
+	authCredentialsSchema,
+	signUpSchema,
+	type SignUpInput,
+	type SignInInput,
+} from '../schemas/auth.schema.js'
 
 const otpVerificationSchema = z.object({
 	otp: z.coerce.number(),
 	userSignupToken: z.string().min(1, 'User signup token is required'),
 })
 
-type SignUpInput = z.infer<typeof signUpSchema>
-type SignInInput = z.infer<typeof authCredentialsSchema>
 type OtpVerificationInput = z.infer<typeof otpVerificationSchema>
+
 
 
 export const sign_up = async (req, res) => {
@@ -49,7 +42,10 @@ export const sign_up = async (req, res) => {
 		})
 
 		if (existingUser) {
-			return res.status(400).json({ message: 'User already exists' })
+			if (existingUser.isVerified) {
+				return res.status(400).json({ message: 'User already exists' })
+			}
+			await prisma.user.delete({ where: { id: existingUser.id } })
 		}
 
 		const hashedOtp = await generateOtp(email)
@@ -102,7 +98,10 @@ export const otp_verification = async (req, res) => {
 		})
 
 		if (existingUser) {
-			return res.status(400).json({ message: 'User already exists' })
+			if (existingUser.isVerified) {
+				return res.status(400).json({ message: 'User already exists' })
+			}
+			await prisma.user.delete({ where: { id: existingUser.id } })
 		}
 
 		const validOtp = await verifyOtpValue(otp, hashedOtp)

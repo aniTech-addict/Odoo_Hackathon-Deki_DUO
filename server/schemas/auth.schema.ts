@@ -44,3 +44,19 @@ export const createOtpSchema = otpSchema.omit({
 })
 
 export type CreateOtpInput = z.infer<typeof createOtpSchema>
+
+export const authCredentialsSchema = z.object({
+	username: z.string().min(1, 'Username is required'),
+	password: z.string().min(1, 'Password is required'),
+})
+
+export const signUpSchema = authCredentialsSchema.extend({
+	email: z.email('Invalid email format'),
+	role: z.enum(['Fleet Manager', 'Dispatcher', 'Safety Officer', 'Financial Analyst'], {
+		message: 'Role must be one of: Fleet Manager, Dispatcher, Safety Officer, Financial Analyst',
+	}),
+})
+
+export type SignUpInput = z.infer<typeof signUpSchema>
+export type SignInInput = z.infer<typeof authCredentialsSchema>
+
